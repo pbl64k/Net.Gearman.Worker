@@ -1,0 +1,5 @@
+Contrary to the name, this doesn't have much to do with Gearman workers.
+I picked Gearman worker API more or less because I was looking into the
+CPAN modules for those at the moment, but what I actually was after were
+Accessors. Unfortunately, using them turned out to be a lot more fugly
+than I hoped it would be.
