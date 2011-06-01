@@ -1,5 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-{-# OPTIONS -fno-monomorphism-restriction #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE OverlappingInstances #-}
 
@@ -265,16 +265,6 @@ logerr = logstr Error
 
 {- -}
 
-serverList = [
-    ServerAddress ("192.168.0.92", N.PortNumber 7003),
-    ServerAddress ("192.168.0.92", N.PortNumber 7003)
-    ]
-
-serviceList = [
-    Invocation ("id", ((\str -> (return . BS.pack . id . BS.unpack) str), Nothing)),
-    Invocation ("reverse", ((\str -> (return . BS.pack . reverse . BS.unpack) str), Nothing))
-    ]
-
 initLogger = do
     let workerId = accFirst
     id <- (~.>) workerId
@@ -423,7 +413,17 @@ worker servers services workerIdStr = (flip runStateT) (new :: WorkerState) $ do
     (workerConnection .* workerLogger) ~.~ connect
     work
 
-t = worker serverList serviceList "gearmanworkerid0"
+serverList = [
+    ServerAddress ("localhost", N.PortNumber 4730),
+    ServerAddress ("localhost", N.PortNumber 7003)
+    ]
 
---main = withSocketsDo worker
+serviceList = [
+    Invocation ("id", ((\str -> (return . BS.pack . id . BS.unpack) str), Nothing)),
+    Invocation ("reverse", ((\str -> (return . BS.pack . reverse . BS.unpack) str), Nothing))
+    ]
+
+main' = worker serverList serviceList "gearmanworkerid0"
+
+--main = withSocketsDo main'
 

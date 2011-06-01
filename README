@@ -3,3 +3,72 @@ I picked Gearman worker API more or less because I was looking into the
 CPAN modules for those at the moment, but what I actually was after were
 Accessors. Unfortunately, using them turned out to be a lot more fugly
 than I hoped it would be.
+
+As far as Worker API goes, this doesn't even know how to sleep, and will
+attempt to poll the servers for jobs all the time, gobbling up all
+available resources in the process. Naturally, it doesn't know how to
+accept jobs either.
+
+Accepting jobs, handing them off to the implementation and packing the
+results back into Gearman packets should be pretty straightforward,
+unless we get into more advanced capabilities such as WORK_STATUS.
+Sufficiently clever sleeping is trickier, as there doesn't seem to be an
+equivalent of select() operating on fd_set anywhere in the standard
+library. Two options for solving this would be either FFI or using
+lighweight threads with blocking reads and Chan to wait for wakeup
+packets. The second option risks hogging the jobs, however, especially if
+we are polling many servers.
+
+Now, onto the real thing.
+
+Accessors are essentially pairs of functions - one allowing inspection of
+a certain projection of a type, and the other lifting a mutation of the
+same projection into a mutation of the type. I shall refer to these two
+functions as inspect and mutate from here on.
+
+The trivial accessor - Accessor a a - for identity projection is thus a
+pair of id as inspect and ($) as mutate.
+
+Somewhat more interesting are the two accessors for pairs:
+Accessor (a, b) a and Accessor (a, b) b - defined as pairs of,
+respectively, fst and first, and snd and second. Those two are named
+accFirst and accSecond in this module.
+
+Throw in a couple of simple combinators, and we can starts building
+something more interesting.
+
+The first one is (.\) which "chains", as it were, two accessors -
+Accessor a b and Accessor b c - into a new one: Accessor a c.
+
+And the other is (.*) which, I feel, would be better explained by its
+type signature rather than by my ramblings:
+
+(.*) :: Accessor t t1 -> Accessor t t2 -> Accessor t (t1, t2)
+
+In this form, all of the above may seem entirely useless, but combining
+it with MonadState looked to me like a promising way for hiding
+complexity and eliminating boilerplate.
+
+To that end I defined functions combining accessors with get and put -
+stateInspect and stateMutate, as well as a rather more involved
+stateEmbedMutation, which, once again, would be best characterized by
+its type:
+
+stateEmbedMutation
+  :: (MonadState a m) => Accessor a b -> StateT b m a1 -> m a1
+
+Having thought up all of the above, as well as a few more functions and
+combinators I won't go into much detail on, I felt I needed to
+investigate as to whether this is going to help any in something closer
+to a practical setting. It's at this point that I started tinkering with
+Gearman Worker API.
+
+A brief inspection of that part of the code should give you a good idea
+as to why this approach didn't work out too well. It's pretty similar
+to working with references to mutables in more traditional languages,
+only handicapped by obscure syntax and with none of the conveniences that
+would normally be available. Moreover, subtle screw-ups with the
+structure of the State tend to lead to very cryptic and hard to debug
+error messages. A mere hundred of LoCs later I was completely convinced
+juggling States explicitly would've been far easier to write - and to
+read - despite certain wordiness.
